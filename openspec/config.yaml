@@ -1,0 +1,20 @@
+schema: spec-driven
+
+context: |
+  專案名稱：ai-fraud-guardian（AI 防詐安全守門員，國泰金控雲世代計畫 A 組）
+  目的：客戶在模擬 CUBE App 轉帳前，上傳可疑截圖／網址／文字，取得 AI 詐騙風險研判並記錄決策
+  系統設計：docs/fraud-guardian-design.md
+  我方範圍：前端與 API Gateway；AI 研判（Step Functions、Textract、Bedrock）由 Bedrock 團隊負責，不在本 repo
+  前端：React + Vite + TypeScript、Ant Design（antd）、react-router，行動優先網頁，程式放在 frontend/
+  後端：API Gateway 直接整合 AWS 服務，不寫 Lambda；DynamoDB（Cases）、S3（evidence）
+  雲端：Cognito、WAF、Amplify、IAM、KMS、CloudWatch
+  測試：本專案不寫自動化測試（不寫單元測試、元件測試）
+  文件語言：繁體中文
+
+rules:
+  proposal:
+    - 提案控制在 500 字以內
+    - 一定要寫明不在範圍內的項目
+  tasks:
+    - 不要安排撰寫測試的任務
+    - 每個任務拆成 2 小時內可完成的大小

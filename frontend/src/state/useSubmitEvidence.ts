@@ -1,0 +1,20 @@
+import { useCallback } from 'react'
+import { useNavigate } from 'react-router'
+import { paths } from '../lib/paths'
+import type { EvidenceSubmission } from '../types/evidence'
+import { useGuardianFlow } from './guardianFlowContext'
+
+// 「開始分析」的送出點。目前只把資料交給分析流程頁面；
+// 串接層（③）在這裡換成壓縮、上傳與呼叫 API。
+export function useSubmitEvidence() {
+  const navigate = useNavigate()
+  const { setSubmission } = useGuardianFlow()
+
+  return useCallback(
+    (submission: EvidenceSubmission) => {
+      setSubmission(submission)
+      navigate(paths.guardianAnalysis)
+    },
+    [navigate, setSubmission],
+  )
+}
