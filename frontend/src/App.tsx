@@ -6,7 +6,7 @@ import { GuardianFlowProvider } from './state/GuardianFlowProvider'
 import { theme } from './theme'
 
 // 路由器由外層（main.tsx）提供
-function App() {
+const App = () => {
   return (
     <ConfigProvider locale={zhTW} theme={theme}>
       <AntApp>

@@ -10,7 +10,7 @@ const evidenceTypes = [
   { icon: <FileTextOutlined />, title: '文字摘要', description: '用自己的話描述對方說了什麼' },
 ]
 
-export function GuardianIntroPage() {
+export const GuardianIntroPage = () => {
   const navigate = useNavigate()
 
   return (

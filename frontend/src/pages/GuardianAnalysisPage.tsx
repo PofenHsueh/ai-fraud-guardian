@@ -1,22 +1,33 @@
-import { Result } from 'antd'
-import { Page } from '../components/Page'
-import { useGuardianFlow } from '../state/guardianFlowContext'
+import { useNavigate } from 'react-router'
+import { AnalyzingView } from '../components/analysis/AnalyzingView'
+import { BlockedView } from '../components/analysis/BlockedView'
+import { FallbackView } from '../components/analysis/FallbackView'
+import { ResultView } from '../components/analysis/ResultView'
+import { bankService, fraudHotline } from '../lib/contacts'
+import { paths } from '../lib/paths'
+import { useAnalysisView } from '../state/useAnalysisView'
+import { useDecide } from '../state/useDecide'
 
-// 佔位頁：查證中與結果畫面由 add-analysis-result-ui 實作
-export function GuardianAnalysisPage() {
-  const { submission } = useGuardianFlow()
+const contacts = [fraudHotline, bankService]
 
-  return (
-    <Page title="分析流程">
-      <Result
-        status="info"
-        title="已收到您的查證資料"
-        subTitle={
-          submission
-            ? `共 ${submission.items.length} 筆，${submission.mode === 'active' ? '主動提醒' : '自行查證'}`
-            : '尚未送出資料'
-        }
-      />
-    </Page>
-  )
+export const GuardianAnalysisPage = () => {
+  const navigate = useNavigate()
+  const view = useAnalysisView()
+  const decide = useDecide()
+
+  switch (view.phase) {
+    case 'analyzing':
+      return <AnalyzingView retrying={view.retrying} />
+    case 'result':
+      return <ResultView result={view.result} onDecide={decide} />
+    case 'failed':
+      return <FallbackView contacts={contacts} onDecide={decide} />
+    case 'blocked':
+      return (
+        <BlockedView
+          onBackToEvidence={() => navigate(paths.guardianEvidence)}
+          onBackToTransfer={() => navigate(paths.transfer)}
+        />
+      )
+  }
 }

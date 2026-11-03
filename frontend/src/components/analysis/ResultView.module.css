@@ -1,0 +1,35 @@
+.risk {
+  padding: 16px;
+  border-radius: 12px;
+  background: #fafafa;
+  margin-bottom: 24px;
+}
+
+.level {
+  font-size: 18px;
+  padding: 4px 12px;
+  margin-bottom: 8px;
+}
+
+.fraudType {
+  display: block;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.signals {
+  list-style: none;
+  margin: 8px 0 24px;
+  padding: 0;
+}
+
+.signal {
+  display: flex;
+  gap: 8px;
+  padding: 6px 0;
+}
+
+.signalIcon {
+  color: #fa8c16;
+  margin-top: 4px;
+}

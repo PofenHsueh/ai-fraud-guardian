@@ -3,7 +3,7 @@ import type { ImageEvidence, TextEvidence, UrlEvidence } from '../types/evidence
 let seq = 0
 const nextId = () => `ev-${Date.now()}-${++seq}`
 
-export function createImageEvidence(file: File): ImageEvidence {
+export const createImageEvidence = (file: File): ImageEvidence => {
   return {
     id: nextId(),
     type: 'image',
@@ -14,10 +14,10 @@ export function createImageEvidence(file: File): ImageEvidence {
   }
 }
 
-export function createUrlEvidence(value: string): UrlEvidence {
+export const createUrlEvidence = (value: string): UrlEvidence => {
   return { id: nextId(), type: 'url', value: value.trim() }
 }
 
-export function createTextEvidence(value: string): TextEvidence {
+export const createTextEvidence = (value: string): TextEvidence => {
   return { id: nextId(), type: 'text', value: value.trim() }
 }

@@ -6,7 +6,7 @@ import { useGuardianFlow } from './guardianFlowContext'
 
 // 「開始分析」的送出點。目前只把資料交給分析流程頁面；
 // 串接層（③）在這裡換成壓縮、上傳與呼叫 API。
-export function useSubmitEvidence() {
+export const useSubmitEvidence = () => {
   const navigate = useNavigate()
   const { setSubmission } = useGuardianFlow()
 

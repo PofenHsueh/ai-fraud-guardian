@@ -10,7 +10,7 @@ type Props = {
   children: ReactNode
 }
 
-export function Page({ title, onBack, footer, children }: Props) {
+export const Page = ({ title, onBack, footer, children }: Props) => {
   return (
     <>
       <header className={onBack ? styles.header : `${styles.header} ${styles.titleOnly}`}>

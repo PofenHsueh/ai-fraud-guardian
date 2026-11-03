@@ -1,21 +1,23 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { canAddEvidence } from '../lib/rules'
+import type { Decision } from '../types/analysis'
 import type { EvidenceItem, EvidenceSubmission, GuardianMode } from '../types/evidence'
 import type { TransferDraft } from '../types/transfer'
 import { GuardianFlowContext, type GuardianFlowValue } from './guardianFlowContext'
 
 const emptyDraft: TransferDraft = { payee: '', amount: null, note: '' }
 
-function releasePreview(item: EvidenceItem) {
+const releasePreview = (item: EvidenceItem) => {
   if (item.type === 'image') URL.revokeObjectURL(item.previewUrl)
 }
 
-export function GuardianFlowProvider({ children }: { children: ReactNode }) {
+export const GuardianFlowProvider = ({ children }: { children: ReactNode }) => {
   const [mode, setMode] = useState<GuardianMode | null>(null)
   const [items, setItems] = useState<EvidenceItem[]>([])
   const [consented, setConsented] = useState(false)
   const [transferDraft, setTransferDraft] = useState<TransferDraft>(emptyDraft)
   const [submission, setSubmission] = useState<EvidenceSubmission | null>(null)
+  const [decision, setDecision] = useState<Decision | null>(null)
 
   const clearItems = useCallback(() => {
     items.forEach(releasePreview)
@@ -27,6 +29,7 @@ export function GuardianFlowProvider({ children }: { children: ReactNode }) {
     (nextMode: GuardianMode) => {
       clearItems()
       setSubmission(null)
+      setDecision(null)
       setMode(nextMode)
     },
     [clearItems],
@@ -45,6 +48,18 @@ export function GuardianFlowProvider({ children }: { children: ReactNode }) {
     [items],
   )
 
+  // 暫停或主動模式繼續：清空轉帳草稿；被動模式繼續：保留草稿，由客戶自己決定是否確認轉帳
+  const finishGuardian = useCallback(
+    (next: Decision) => {
+      const transferCompleted = next === 'continued' && mode === 'active'
+      if (next === 'paused' || transferCompleted) setTransferDraft(emptyDraft)
+      clearItems()
+      setMode(null)
+      return transferCompleted
+    },
+    [mode, clearItems],
+  )
+
   const value = useMemo<GuardianFlowValue>(
     () => ({
       mode,
@@ -52,6 +67,7 @@ export function GuardianFlowProvider({ children }: { children: ReactNode }) {
       consented,
       transferDraft,
       submission,
+      decision,
       startGuardian,
       addItem,
       removeItem,
@@ -59,8 +75,10 @@ export function GuardianFlowProvider({ children }: { children: ReactNode }) {
       setConsented,
       setTransferDraft,
       setSubmission,
+      setDecision,
+      finishGuardian,
     }),
-    [mode, items, consented, transferDraft, submission, startGuardian, addItem, removeItem, clearItems],
+    [mode, items, consented, transferDraft, submission, decision, startGuardian, addItem, removeItem, clearItems, finishGuardian],
   )
 
   return <GuardianFlowContext.Provider value={value}>{children}</GuardianFlowContext.Provider>

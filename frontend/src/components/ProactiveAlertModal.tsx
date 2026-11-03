@@ -8,7 +8,7 @@ type Props = {
   onClose: () => void
 }
 
-export function ProactiveAlertModal({ open, onVerify, onSkip, onClose }: Props) {
+export const ProactiveAlertModal = ({ open, onVerify, onSkip, onClose }: Props) => {
   return (
     <Modal open={open} title="這筆轉帳請先停一下" onCancel={onClose} footer={null} centered width={MOBILE_MODAL_WIDTH}>
       <Typography.Paragraph>

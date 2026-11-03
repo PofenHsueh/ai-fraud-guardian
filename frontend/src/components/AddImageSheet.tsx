@@ -8,7 +8,7 @@ type Props = {
   onAdd: (file: File) => void
 }
 
-export function AddImageSheet({ open, onClose, onAdd }: Props) {
+export const AddImageSheet = ({ open, onClose, onAdd }: Props) => {
   const { message } = App.useApp()
 
   return (

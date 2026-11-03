@@ -9,7 +9,7 @@ import { shouldShowProactiveAlert } from '../lib/rules'
 import { useGuardianFlow } from '../state/guardianFlowContext'
 import type { GuardianMode } from '../types/evidence'
 
-export function TransferPage() {
+export const TransferPage = () => {
   const navigate = useNavigate()
   const { message } = App.useApp()
   const { transferDraft, setTransferDraft, startGuardian } = useGuardianFlow()

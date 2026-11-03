@@ -14,7 +14,7 @@ import { useSubmitEvidence } from '../state/useSubmitEvidence'
 
 type Sheet = 'image' | 'url' | 'text' | null
 
-export function GuardianEvidencePage() {
+export const GuardianEvidencePage = () => {
   const navigate = useNavigate()
   const { modal } = App.useApp()
   const { mode, items, consented, addItem, removeItem, clearItems, setConsented } = useGuardianFlow()

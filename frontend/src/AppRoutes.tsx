@@ -7,7 +7,7 @@ import { GuardianIntroPage } from './pages/GuardianIntroPage'
 import { LoginPage } from './pages/LoginPage'
 import { TransferPage } from './pages/TransferPage'
 
-export function AppRoutes() {
+export const AppRoutes = () => {
   return (
     <Routes>
       <Route path={paths.login} element={<LoginPage />} />

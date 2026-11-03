@@ -13,7 +13,7 @@ type Props = {
 
 // 從畫面底部彈出的新增視窗，取消或點遮罩即關閉
 // Drawer 掛在 body 下不受版型限制，所以限制最大寬度並置中，遮罩維持全螢幕
-export function BottomSheet({ open, title, onClose, children, primaryAction }: Props) {
+export const BottomSheet = ({ open, title, onClose, children, primaryAction }: Props) => {
   return (
     <Drawer
       open={open}

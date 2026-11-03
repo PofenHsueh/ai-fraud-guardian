@@ -9,7 +9,7 @@ type Props = {
   onAdd: (value: string) => void
 }
 
-export function AddTextSheet({ open, onClose, onAdd }: Props) {
+export const AddTextSheet = ({ open, onClose, onAdd }: Props) => {
   const [value, setValue] = useState('')
   const atLimit = value.length >= MAX_TEXT_LENGTH
 

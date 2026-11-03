@@ -13,7 +13,7 @@ type Props = {
 const PREVIEW_FALLBACK =
   'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><rect width="48" height="48" fill="%23f5f5f5"/><path d="M14 32l7-9 5 6 4-4 4 7z" fill="%23bfbfbf"/></svg>'
 
-function itemLabel(item: EvidenceItem): { title: string; meta: string } {
+const itemLabel = (item: EvidenceItem): { title: string; meta: string } => {
   switch (item.type) {
     case 'image':
       return { title: item.fileName, meta: `截圖．${formatFileSize(item.sizeBytes)}` }
@@ -24,7 +24,7 @@ function itemLabel(item: EvidenceItem): { title: string; meta: string } {
   }
 }
 
-function ItemIcon({ item }: { item: EvidenceItem }) {
+const ItemIcon = ({ item }: { item: EvidenceItem }) => {
   if (item.type === 'image') {
     return (
       <Image
@@ -40,7 +40,7 @@ function ItemIcon({ item }: { item: EvidenceItem }) {
   return <span className={styles.icon}>{item.type === 'url' ? <LinkOutlined /> : <FileTextOutlined />}</span>
 }
 
-export function EvidenceList({ items, onRemove }: Props) {
+export const EvidenceList = ({ items, onRemove }: Props) => {
   return (
     <>
       <Typography.Text strong>已新增 {items.length} 筆</Typography.Text>

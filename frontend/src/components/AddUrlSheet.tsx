@@ -9,7 +9,7 @@ type Props = {
   onAdd: (value: string) => void
 }
 
-export function AddUrlSheet({ open, onClose, onAdd }: Props) {
+export const AddUrlSheet = ({ open, onClose, onAdd }: Props) => {
   const [value, setValue] = useState('')
   const [error, setError] = useState<string | null>(null)
 

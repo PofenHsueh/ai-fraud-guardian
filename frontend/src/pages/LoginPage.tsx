@@ -5,7 +5,7 @@ import { Page } from '../components/Page'
 import { paths } from '../lib/paths'
 
 // 示範用登入頁：不驗證、不送出、不保存輸入內容
-export function LoginPage() {
+export const LoginPage = () => {
   const navigate = useNavigate()
   const [account, setAccount] = useState('')
   const [password, setPassword] = useState('')
