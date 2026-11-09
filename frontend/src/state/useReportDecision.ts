@@ -1,17 +1,24 @@
 import { useCallback } from 'react'
+import { isApiConfigured, reportCaseDecision } from '../lib/guardianApi'
 import type { Decision } from '../types/analysis'
 import { useGuardianFlow } from './guardianFlowContext'
 
-// 回報決策的接點。目前只把決策存進流程狀態並輸出到 console，方便示範時確認；
-// 串接層（③）在這裡換成呼叫 POST /cases/{id}/decision。
+// 回報決策的接點（角色 ③）：
+// 已設定 VITE_API_BASE_URL 且有 caseId 時呼叫 POST /cases/{id}/decision；否則僅記錄於本機狀態。
 export const useReportDecision = () => {
-  const { setDecision } = useGuardianFlow()
+  const { caseId, setDecision } = useGuardianFlow()
 
   return useCallback(
     (decision: Decision) => {
       setDecision(decision)
-      console.info('[示範] 回報決策：', decision)
+      if (isApiConfigured() && caseId) {
+        reportCaseDecision(caseId, decision).catch((err) => {
+          console.warn('[API] 回報決策失敗：', err)
+        })
+      } else {
+        console.info('[示範] 回報決策：', decision)
+      }
     },
-    [setDecision],
+    [caseId, setDecision],
   )
 }

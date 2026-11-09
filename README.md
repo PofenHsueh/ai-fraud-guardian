@@ -40,4 +40,4 @@ npm run lint    # 程式碼檢查
 npm run build   # 型別檢查並建置到 dist/
 ```
 
-目錄結構與串接說明見 [`frontend/README.md`](frontend/README.md)，系統設計見 [`docs/fraud-guardian-design.md`](docs/fraud-guardian-design.md)。
+目錄結構與串接說明見 [`frontend/README.md`](frontend/README.md)，系統設計見 [`docs/fraud-guardian-design.md`](docs/fraud-guardian-design.md)，後端 API 規格與 AWS API Gateway 設定教學見 [`docs/API-SPEC.md`](docs/API-SPEC.md)。

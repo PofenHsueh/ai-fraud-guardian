@@ -2,7 +2,7 @@
 
 模擬 CUBE App 的轉帳流程與防詐安全守門員畫面。技術：React + Vite + TypeScript、Ant Design（`antd`）、react-router。
 
-需求與設計見 `openspec/changes/add-evidence-upload-ui/`，系統整體設計見 `docs/fraud-guardian-design.md`。
+需求與設計見 `openspec/changes/add-evidence-upload-ui/`，系統整體設計見 `docs/fraud-guardian-design.md`，後端 API 規格與 AWS 設定教學見 `docs/API-SPEC.md`。
 
 ## 指令
 

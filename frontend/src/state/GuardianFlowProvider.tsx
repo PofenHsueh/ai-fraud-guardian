@@ -17,6 +17,7 @@ export const GuardianFlowProvider = ({ children }: { children: ReactNode }) => {
   const [consented, setConsented] = useState(false)
   const [transferDraft, setTransferDraft] = useState<TransferDraft>(emptyDraft)
   const [submission, setSubmission] = useState<EvidenceSubmission | null>(null)
+  const [caseId, setCaseId] = useState<string | null>(null)
   const [decision, setDecision] = useState<Decision | null>(null)
 
   const clearItems = useCallback(() => {
@@ -29,6 +30,7 @@ export const GuardianFlowProvider = ({ children }: { children: ReactNode }) => {
     (nextMode: GuardianMode) => {
       clearItems()
       setSubmission(null)
+      setCaseId(null)
       setDecision(null)
       setMode(nextMode)
     },
@@ -67,6 +69,7 @@ export const GuardianFlowProvider = ({ children }: { children: ReactNode }) => {
       consented,
       transferDraft,
       submission,
+      caseId,
       decision,
       startGuardian,
       addItem,
@@ -75,10 +78,11 @@ export const GuardianFlowProvider = ({ children }: { children: ReactNode }) => {
       setConsented,
       setTransferDraft,
       setSubmission,
+      setCaseId,
       setDecision,
       finishGuardian,
     }),
-    [mode, items, consented, transferDraft, submission, decision, startGuardian, addItem, removeItem, clearItems, finishGuardian],
+    [mode, items, consented, transferDraft, submission, caseId, decision, startGuardian, addItem, removeItem, clearItems, finishGuardian],
   )
 
   return <GuardianFlowContext.Provider value={value}>{children}</GuardianFlowContext.Provider>

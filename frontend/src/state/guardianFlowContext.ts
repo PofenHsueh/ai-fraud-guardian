@@ -9,6 +9,7 @@ export type GuardianFlowValue = {
   consented: boolean
   transferDraft: TransferDraft
   submission: EvidenceSubmission | null
+  caseId: string | null
   // 最近一次交出的決策，下次進入守門員時清空
   decision: Decision | null
   startGuardian: (mode: GuardianMode) => void
@@ -18,6 +19,7 @@ export type GuardianFlowValue = {
   setConsented: (consented: boolean) => void
   setTransferDraft: (draft: TransferDraft) => void
   setSubmission: (submission: EvidenceSubmission) => void
+  setCaseId: (caseId: string | null) => void
   setDecision: (decision: Decision) => void
   // 結束守門員流程並清理狀態；回傳 true 表示應顯示轉帳完成
   finishGuardian: (decision: Decision) => boolean
