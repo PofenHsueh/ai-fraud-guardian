@@ -1,0 +1,33 @@
+.risk {
+  padding: 16px;
+  margin-bottom: 24px;
+  border: 1.5px solid;
+  border-radius: 8px;
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.signals {
+  list-style: none;
+  margin: 8px 0 24px;
+  padding: 0;
+}
+
+.signal {
+  display: flex;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  margin-top: 9px;
+  border-radius: 50%;
+}
+
+.suggestion {
+  font-style: italic;
+}

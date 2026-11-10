@@ -1,0 +1,22 @@
+.account {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 6em;
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+/* 手機寬度放不下返回、標題、名稱與登出，只保留登出 */
+@media (max-width: 420px) {
+  .name {
+    display: none;
+  }
+}

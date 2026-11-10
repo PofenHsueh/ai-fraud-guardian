@@ -32,6 +32,22 @@ export const getStoredIdToken = (): string | null => {
   return null
 }
 
+// 從 ID Token 取出顯示用名稱；只用於畫面顯示，不做驗證
+export const getSignedInName = (): string | null => {
+  const token = getStoredIdToken()
+  const payload = token?.split('.')[1]
+  if (!payload) return null
+  try {
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/')
+    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
+    const claims = JSON.parse(new TextDecoder().decode(bytes)) as Record<string, unknown>
+    const name = claims.name ?? claims['cognito:username'] ?? claims.email
+    return typeof name === 'string' && name.trim() !== '' ? name.trim() : null
+  } catch {
+    return null
+  }
+}
+
 export const clearAuthTokens = () => {
   window.sessionStorage.removeItem(ID_TOKEN_KEY)
   window.sessionStorage.removeItem(REFRESH_TOKEN_KEY)

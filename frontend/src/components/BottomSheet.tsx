@@ -1,6 +1,6 @@
 import { Button, Drawer, Flex } from 'antd'
 import type { ReactNode } from 'react'
-import { MOBILE_MAX_WIDTH } from '../theme'
+import { MOBILE_MAX_WIDTH } from '@/config/theme'
 
 type Props = {
   open: boolean

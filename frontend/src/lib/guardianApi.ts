@@ -1,5 +1,5 @@
-import type { Decision } from '../types/analysis'
-import type { GuardianMode } from '../types/evidence'
+import type { Decision } from '@/types/analysis'
+import type { GuardianMode } from '@/types/evidence'
 import { getStoredIdToken, refreshCognitoToken } from './cognitoAuth'
 
 export class ApiHttpError extends Error {

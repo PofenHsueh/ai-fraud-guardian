@@ -13,6 +13,156 @@
         "allowConstantExport": true
       }
     ],
-    "react/no-danger": "error"
-  }
+    "react/no-danger": "error",
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": [
+              "../**"
+            ],
+            "message": "跨資料夾請用 @/ 匯入"
+          }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": [
+        "src/components/**",
+        "src/config/**",
+        "src/lib/**",
+        "src/stores/**",
+        "src/types/**"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "../**"
+                ],
+                "message": "跨資料夾請用 @/ 匯入"
+              },
+              {
+                "group": [
+                  "@/features/**"
+                ],
+                "message": "共用層不可依賴功能層"
+              },
+              {
+                "group": [
+                  "@/app/**"
+                ],
+                "message": "只有 app/ 可以組合頁面與路由"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/features/transfer/**"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "../**"
+                ],
+                "message": "跨資料夾請用 @/ 匯入"
+              },
+              {
+                "group": [
+                  "@/features/evidence/**",
+                  "@/features/analysis/**"
+                ],
+                "message": "功能之間不互相匯入，請在 app/routes/ 組合"
+              },
+              {
+                "group": [
+                  "@/app/**"
+                ],
+                "message": "只有 app/ 可以組合頁面與路由"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/features/evidence/**"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "../**"
+                ],
+                "message": "跨資料夾請用 @/ 匯入"
+              },
+              {
+                "group": [
+                  "@/features/transfer/**",
+                  "@/features/analysis/**"
+                ],
+                "message": "功能之間不互相匯入，請在 app/routes/ 組合"
+              },
+              {
+                "group": [
+                  "@/app/**"
+                ],
+                "message": "只有 app/ 可以組合頁面與路由"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/features/analysis/**"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "../**"
+                ],
+                "message": "跨資料夾請用 @/ 匯入"
+              },
+              {
+                "group": [
+                  "@/features/transfer/**",
+                  "@/features/evidence/**"
+                ],
+                "message": "功能之間不互相匯入，請在 app/routes/ 組合"
+              },
+              {
+                "group": [
+                  "@/app/**"
+                ],
+                "message": "只有 app/ 可以組合頁面與路由"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
 }

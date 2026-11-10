@@ -52,7 +52,7 @@ ticket: "AFG-API-001"
 | 專案角色 | 對應 `copilot_rules` Role | 主要套用規範 (`instructions/`) | 職責與交付物 |
 |---|---|---|---|
 | **角色 ②：API 設定與對接** | `Role_SA_PM_Engineer.md`<br>`Role_Security_Engineer.md` | `A01_securityOwasp.md` | 制定本份 `docs/API-SPEC.md`、撰寫與測試 VTL Mapping Templates、提供 [`docs/openapi-apigw.yaml`](./openapi-apigw.yaml) 匯入檔、與 Bedrock 團隊定案交接點 A/B/C |
-| **角色 ③：前端 API 串接** | `Role_React_Frontend.md` | `E02_reactFrontend.md`<br>`A01_securityOwasp.md` | 實作 Cognito Token 注入、Canvas 截圖壓縮（`<= 10 MB`）、替換 `frontend/src/state/` 下的 `useSubmitEvidence.ts`、`useAnalysisView.ts`、`useReportDecision.ts` |
+| **角色 ③：前端 API 串接** | `Role_React_Frontend.md` | `E02_reactFrontend.md`<br>`A01_securityOwasp.md` | 實作 Cognito Token 注入、Canvas 截圖壓縮（`<= 10 MB`）、替換 `frontend/src/features/evidence/api/useSubmitEvidence.ts`、`frontend/src/features/analysis/api/` 下的 `useAnalysisView.ts`、`useReportDecision.ts` |
 
 ---
 
@@ -70,7 +70,7 @@ ticket: "AFG-API-001"
   - **嚴禁信任前端傳入的 `userId`**。
   - 上傳截圖（S3 Key 自動嵌入 `$context.authorizer.claims.sub`）、查詢結果（Response VTL 比對 `$item.userId.S == $context.authorizer.claims.sub`）與回報決策（DynamoDB `ConditionExpression: "userId = :uid"`）皆強制綁定本人身分。
 
-### 2.2 輸入驗證與大小限制（對齊 `frontend/src/lib/rules.ts`）
+### 2.2 輸入驗證與大小限制（對齊 `frontend/src/config/limits.ts`）
 
 | 項目 | 上限／規則 | 防護層級 |
 |---|---|---|
@@ -729,4 +729,4 @@ API Gateway 需要一個 IAM Role 才能代替前端去寫入 DynamoDB、上傳 
 - **串接檔案對應**：
   - [`frontend/src/lib/imageCompressor.ts`](../frontend/src/lib/imageCompressor.ts)：在瀏覽器端透過 Canvas 將截圖壓縮並限制於 `10 MB` 以內。
   - [`frontend/src/lib/guardianApi.ts`](../frontend/src/lib/guardianApi.ts)：封裝 5 支 API 的呼叫、Cognito Bearer Token Header 注入，以及 `401` / `403` / `429` 狀態碼解析。
-  - [`frontend/src/state/useSubmitEvidence.ts`](../frontend/src/state/useSubmitEvidence.ts)、[`frontend/src/state/useAnalysisView.ts`](../frontend/src/state/useAnalysisView.ts)、[`frontend/src/state/useReportDecision.ts`](../frontend/src/state/useReportDecision.ts)：串接完整 5 步驟非同步流程與每 2.5 秒輪詢（30 秒逾時自動切換 165 備援畫面）。
+  - [`frontend/src/features/evidence/api/useSubmitEvidence.ts`](../frontend/src/features/evidence/api/useSubmitEvidence.ts)、[`frontend/src/features/analysis/api/useAnalysisView.ts`](../frontend/src/features/analysis/api/useAnalysisView.ts)、[`frontend/src/features/analysis/api/useReportDecision.ts`](../frontend/src/features/analysis/api/useReportDecision.ts)：串接完整 5 步驟非同步流程與每 2.5 秒輪詢（30 秒逾時自動切換 165 備援畫面）。
