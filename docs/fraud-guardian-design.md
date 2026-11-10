@@ -131,7 +131,7 @@
   "mode": "passive",
   "submittedAt": "2026-11-03T10:15+08:00",
   "evidence": [
-    { "type": "image", "s3Key": "u123/c-7f3a/01.png" },
+    { "type": "image", "s3Key": "evidence/u123/c-7f3a/01.png" },
     { "type": "url", "value": "reurl.cc/abc123" },
     { "type": "text", "value": "保證每月穩賺 10%" }
   ]

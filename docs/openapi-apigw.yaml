@@ -1,0 +1,328 @@
+openapi: "3.0.1"
+info:
+  title: "ai-fraud-guardian-api"
+  description: "AI 防詐安全守門員 REST API（方案 1：AWS API Gateway 直接整合 DynamoDB / S3 / Step Functions，不寫 Lambda）"
+  version: "1.0.0"
+
+paths:
+  /cases:
+    post:
+      summary: "1. 建立 Case (DynamoDB PutItem)"
+      security:
+        - CognitoUserPoolAuthorizer: []
+      responses:
+        "200":
+          description: "200 OK"
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: "string"
+      x-amazon-apigateway-integration:
+        type: "aws"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:ap-northeast-1:dynamodb:action/PutItem"
+        credentials: "arn:aws:iam::YOUR_ACCOUNT_ID:role/APIGatewayFraudGuardianRole"
+        passthroughBehavior: "when_no_templates"
+        requestTemplates:
+          application/json: |
+            #set($caseId = "c-$context.requestId")
+            #set($userId = $context.authorizer.claims.sub)
+            #if(!$userId || $userId == "")
+              #set($userId = "anonymous-dev")
+            #end
+            #set($inputRoot = $input.path('$'))
+            {
+              "TableName": "ai-fraud-guardian-cases-${stageVariables.env}",
+              "Item": {
+                "caseId": { "S": "$caseId" },
+                "userId": { "S": "$userId" },
+                "mode": { "S": "$util.escapeJavaScript($inputRoot.mode)" },
+                "status": { "S": "SUBMITTED" },
+                "consentedAt": { "S": "$util.escapeJavaScript($inputRoot.consentedAt)" },
+                "submittedAt": { "S": "$context.requestTime" },
+                "evidence": {
+                  "L": [
+                    #foreach($item in $inputRoot.evidence)
+                    {
+                      "M": {
+                        "type": { "S": "$util.escapeJavaScript($item.type)" }
+                        #if($item.type == "image")
+                        ,"s3Key": { "S": "evidence/$userId/$caseId/$util.escapeJavaScript($item.fileName)" }
+                        #else
+                        ,"value": { "S": "$util.escapeJavaScript($item.value)" }
+                        #end
+                      }
+                    }#if($foreach.hasNext),#end
+                    #end
+                  ]
+                }
+              }
+            }
+        responses:
+          default:
+            statusCode: "200"
+            responseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            responseTemplates:
+              application/json: |
+                #set($caseId = "c-$context.requestId")
+                #set($userId = $context.authorizer.claims.sub)
+                #if(!$userId || $userId == "")
+                  #set($userId = "anonymous-dev")
+                #end
+                {
+                  "caseId": "$caseId",
+                  "userId": "$userId",
+                  "status": "SUBMITTED",
+                  "submittedAt": "$context.requestTime"
+                }
+
+  /cases/{id}/files/{n}:
+    put:
+      summary: "2. 上傳截圖 (S3 PutObject)"
+      parameters:
+        - name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+        - name: "n"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+        - name: "Content-Type"
+          in: "header"
+          required: true
+          schema:
+            type: "string"
+      security:
+        - CognitoUserPoolAuthorizer: []
+      responses:
+        "200":
+          description: "200 OK"
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: "string"
+      x-amazon-apigateway-integration:
+        type: "aws"
+        httpMethod: "PUT"
+        uri: "arn:aws:apigateway:ap-northeast-1:s3:path/${stageVariables.evidenceBucket}/evidence/{userId}/{caseId}/{n}"
+        credentials: "arn:aws:iam::YOUR_ACCOUNT_ID:role/APIGatewayFraudGuardianRole"
+        passthroughBehavior: "when_no_match"
+        requestParameters:
+          integration.request.path.userId: "context.authorizer.claims.sub"
+          integration.request.path.caseId: "method.request.path.id"
+          integration.request.path.n: "method.request.path.n"
+          integration.request.header.Content-Type: "method.request.header.Content-Type"
+        responses:
+          default:
+            statusCode: "200"
+            responseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            responseTemplates:
+              application/json: |
+                {
+                  "uploaded": true
+                }
+
+  /cases/{id}/analyze:
+    post:
+      summary: "3. 啟動分析 (Step Functions StartExecution - 交接點 A)"
+      parameters:
+        - name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        - CognitoUserPoolAuthorizer: []
+      responses:
+        "200":
+          description: "200 OK"
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: "string"
+      x-amazon-apigateway-integration:
+        type: "aws"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:ap-northeast-1:states:action/StartExecution"
+        credentials: "arn:aws:iam::YOUR_ACCOUNT_ID:role/APIGatewayFraudGuardianRole"
+        passthroughBehavior: "when_no_templates"
+        requestTemplates:
+          application/json: |
+            #set($caseId = $input.params('id'))
+            #set($userId = $context.authorizer.claims.sub)
+            #if(!$userId || $userId == "")
+              #set($userId = "anonymous-dev")
+            #end
+            #set($inputRoot = $input.path('$'))
+            #set($sfnInput = "{""schemaVersion"":""1.0"",""caseId"":""$util.escapeJavaScript($caseId)"",""userId"":""$util.escapeJavaScript($userId)"",""mode"":""$util.escapeJavaScript($inputRoot.mode)"",""submittedAt"":""$util.escapeJavaScript($inputRoot.submittedAt)"",""evidence"":$input.json('$.evidence')}")
+            {
+              "stateMachineArn": "${stageVariables.bedrockStateMachineArn}",
+              "name": "$util.escapeJavaScript($caseId)-$context.requestId",
+              "input": "$util.escapeJavaScript($sfnInput)"
+            }
+        responses:
+          default:
+            statusCode: "200"
+            responseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            responseTemplates:
+              application/json: |
+                #set($caseId = $input.params('id'))
+                {
+                  "caseId": "$util.escapeJavaScript($caseId)",
+                  "status": "PROCESSING",
+                  "executionArn": $input.json('$.executionArn')
+                }
+
+  /cases/{id}:
+    get:
+      summary: "4. 取回結果 (DynamoDB GetItem - 讀取交接點 C)"
+      parameters:
+        - name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        - CognitoUserPoolAuthorizer: []
+      responses:
+        "200":
+          description: "200 OK"
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: "string"
+      x-amazon-apigateway-integration:
+        type: "aws"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:ap-northeast-1:dynamodb:action/GetItem"
+        credentials: "arn:aws:iam::YOUR_ACCOUNT_ID:role/APIGatewayFraudGuardianRole"
+        passthroughBehavior: "when_no_templates"
+        requestTemplates:
+          application/json: |
+            {
+              "TableName": "ai-fraud-guardian-cases-${stageVariables.env}",
+              "Key": {
+                "caseId": {
+                  "S": "$util.escapeJavaScript($input.params('id'))"
+                }
+              },
+              "ConsistentRead": true
+            }
+        responses:
+          default:
+            statusCode: "200"
+            responseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            responseTemplates:
+              application/json: |
+                #set($item = $input.path('$.Item'))
+                #set($callerUserId = $context.authorizer.claims.sub)
+                #if(!$callerUserId || $callerUserId == "")
+                  #set($callerUserId = "anonymous-dev")
+                #end
+                #if($item == "" || !$item.caseId || $item.caseId.S == "")
+                  #set($context.responseOverride.status = 404)
+                  {
+                    "error": {
+                      "code": "CASE_NOT_FOUND",
+                      "message": "找不到對應的查證案件"
+                    }
+                  }
+                #elseif($item.userId.S != $callerUserId)
+                  #set($context.responseOverride.status = 403)
+                  {
+                    "error": {
+                      "code": "FORBIDDEN",
+                      "message": "無權限存取此查證案件"
+                    }
+                  }
+                #else
+                  {
+                    "caseId": "$util.escapeJavaScript($item.caseId.S)",
+                    "status": "$util.escapeJavaScript($item.status.S)"
+                    #if($item.result && $item.result.M)
+                    ,"result": {
+                      "schemaVersion": "$util.escapeJavaScript($item.result.M.schemaVersion.S)",
+                      "riskLevel": "$util.escapeJavaScript($item.result.M.riskLevel.S)",
+                      "fraudType": "$util.escapeJavaScript($item.result.M.fraudType.S)",
+                      "signals": [
+                        #foreach($sig in $item.result.M.signals.L)
+                          "$util.escapeJavaScript($sig.S)"#if($foreach.hasNext),#end
+                        #end
+                      ],
+                      "suggestion": "$util.escapeJavaScript($item.result.M.suggestion.S)",
+                      "errorCode": #if($item.result.M.errorCode && $item.result.M.errorCode.S && $item.result.M.errorCode.S != "")"$util.escapeJavaScript($item.result.M.errorCode.S)"#else null #end
+                    }
+                    #end
+                  }
+                #end
+
+  /cases/{id}/decision:
+    post:
+      summary: "5. 回報決策 (DynamoDB UpdateItem)"
+      parameters:
+        - name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        - CognitoUserPoolAuthorizer: []
+      responses:
+        "200":
+          description: "200 OK"
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: "string"
+      x-amazon-apigateway-integration:
+        type: "aws"
+        httpMethod: "POST"
+        uri: "arn:aws:apigateway:ap-northeast-1:dynamodb:action/UpdateItem"
+        credentials: "arn:aws:iam::YOUR_ACCOUNT_ID:role/APIGatewayFraudGuardianRole"
+        passthroughBehavior: "when_no_templates"
+        requestTemplates:
+          application/json: |
+            #set($caseId = $input.params('id'))
+            #set($userId = $context.authorizer.claims.sub)
+            #if(!$userId || $userId == "")
+              #set($userId = "anonymous-dev")
+            #end
+            #set($decision = $input.path('$.decision'))
+            {
+              "TableName": "ai-fraud-guardian-cases-${stageVariables.env}",
+              "Key": {
+                "caseId": { "S": "$util.escapeJavaScript($caseId)" }
+              },
+              "ConditionExpression": "userId = :uid",
+              "UpdateExpression": "SET decision = :dec, decidedAt = :now",
+              "ExpressionAttributeValues": {
+                ":uid": { "S": "$util.escapeJavaScript($userId)" },
+                ":dec": { "S": "$util.escapeJavaScript($decision)" },
+                ":now": { "S": "$context.requestTime" }
+              }
+            }
+        responses:
+          default:
+            statusCode: "200"
+            responseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            responseTemplates:
+              application/json: |
+                #set($caseId = $input.params('id'))
+                {
+                  "caseId": "$util.escapeJavaScript($caseId)",
+                  "recorded": true
+                }
+
+x-amazon-apigateway-binary-media-types:
+  - "image/png"
+  - "image/jpeg"
+  - "image/webp"
+

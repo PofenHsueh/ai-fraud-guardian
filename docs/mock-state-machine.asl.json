@@ -1,0 +1,84 @@
+{
+  "Comment": "AI 防詐安全守門員 — 階段二聯調用 Mock Step Functions 狀態機（模擬 Bedrock 團隊接收交接點 A 並於 3 秒後將結果寫回 DynamoDB 交接點 C，不需 Lambda）",
+  "StartAt": "MarkProcessing",
+  "States": {
+    "MarkProcessing": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:updateItem",
+      "Parameters": {
+        "TableName": "ai-fraud-guardian-cases-dev",
+        "Key": {
+          "caseId": {
+            "S.$": "$.caseId"
+          }
+        },
+        "UpdateExpression": "SET #st = :proc",
+        "ExpressionAttributeNames": {
+          "#st": "status"
+        },
+        "ExpressionAttributeValues": {
+          ":proc": {
+            "S": "PROCESSING"
+          }
+        }
+      },
+      "ResultPath": null,
+      "Next": "SimulateBedrockThinking"
+    },
+    "SimulateBedrockThinking": {
+      "Type": "Wait",
+      "Seconds": 3,
+      "Next": "WriteMockCompletedResult"
+    },
+    "WriteMockCompletedResult": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:updateItem",
+      "Parameters": {
+        "TableName": "ai-fraud-guardian-cases-dev",
+        "Key": {
+          "caseId": {
+            "S.$": "$.caseId"
+          }
+        },
+        "UpdateExpression": "SET #st = :done, #res = :resultMap",
+        "ExpressionAttributeNames": {
+          "#st": "status",
+          "#res": "result"
+        },
+        "ExpressionAttributeValues": {
+          ":done": {
+            "S": "COMPLETED"
+          },
+          ":resultMap": {
+            "M": {
+              "schemaVersion": {
+                "S": "1.0"
+              },
+              "riskLevel": {
+                "S": "MEDIUM_HIGH"
+              },
+              "fraudType": {
+                "S": "疑似假投資詐騙"
+              },
+              "signals": {
+                "L": [
+                  {
+                    "S": "對話中出現保證獲利話術"
+                  },
+                  {
+                    "S": "要求私下加 LINE 匯款"
+                  }
+                ]
+              },
+              "suggestion": {
+                "S": "暫緩匯款，並向 165 反詐騙專線查證"
+              }
+            }
+          }
+        }
+      },
+      "End": true
+    }
+  }
+}
+
