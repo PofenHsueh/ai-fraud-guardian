@@ -8,13 +8,14 @@ import type { EvidenceSubmission } from '@/types/evidence'
 // 串接層（③）在這裡換成壓縮、上傳與呼叫 API。
 export const useSubmitEvidence = () => {
   const navigate = useNavigate()
-  const { setSubmission } = useGuardianFlow()
+  const { setCaseId, setSubmission } = useGuardianFlow()
 
   return useCallback(
     (submission: EvidenceSubmission) => {
+      setCaseId(null)
       setSubmission(submission)
       navigate(paths.guardianAnalysis)
     },
-    [navigate, setSubmission],
+    [navigate, setCaseId, setSubmission],
   )
 }

@@ -1,7 +1,7 @@
 ---
 title: "AI 防詐安全守門員 — 後端 API 規格書與 AWS API Gateway 設定教學 (API-SPEC)"
 description: "採用方案 1（AWS API Gateway 直接整合 AWS 服務，不寫 Lambda）：定義 5 支核心 API 的 HTTP 契約、VTL Mapping Templates、DynamoDB/S3/StepFunctions 設定教學與前端串接規範"
-date: 2026-11-09
+date: 2026-11-10
 tags: ["API-SPEC", "AWS", "API-Gateway", "VTL", "DynamoDB", "S3", "StepFunctions", "Bedrock", "No-Lambda"]
 author: "Eddie"
 category: "Spec"
@@ -15,6 +15,7 @@ ticket: "AFG-API-001"
 
 - [1. 架構決策與角色分工邊界](#1-架構決策與角色分工邊界)
 - [2. 全域 API 規範與資安防線](#2-全域-api-規範與資安防線)
+  - [2.4 使用者異常操作防呆規格表 (Defensive Design Table)](#24-使用者異常操作防呆規格表-defensive-design-table)
 - [3. 資料儲存規格（DynamoDB Cases 表與 S3 Evidence）](#3-資料儲存規格dynamodb-cases-表與-s3-evidence)
 - [4. 5 支 API 端點詳細規格與 VTL Mapping Templates](#4-5-支-api-端點詳細規格與-vtl-mapping-templates)
   - [4.1 API 1：建立案件 `POST /cases`](#41-api-1建立案件-post-cases)
@@ -32,6 +33,7 @@ ticket: "AFG-API-001"
   - [Step 7：設定 Stage Variables 並部署至 `dev` / `demo`](#step-7設定-stage-variables-並部署至-dev--demo)
 - [6. 與 Bedrock 團隊跨帳號／跨角色 IAM 最小權限設定](#6-與-bedrock-團隊跨帳號跨角色-iam-最小權限設定)
 - [7. 前端串接層（角色 ③）對接說明](#7-前端串接層角色-③對接說明)
+- [8. 版本與功能補充紀錄](#8-版本與功能補充紀錄)
 
 ---
 
@@ -98,8 +100,22 @@ ticket: "AFG-API-001"
 | `403 Forbidden` | `FORBIDDEN` | 被 AWS WAF 阻擋，或嘗試存取非本人之 `caseId` | 轉換為 `AnalysisView` 的 `{ phase: 'blocked' }` |
 | `404 Not Found` | `CASE_NOT_FOUND` | 指定的 `caseId` 不存在 | 轉換為 `{ phase: 'failed' }` 並顯示 165 備援管道 |
 | `413 Payload Too Large` | `FILE_TOO_LARGE` | 單張截圖超過 API Gateway 10 MB 上限 | 前端壓縮確保小於 10 MB |
-| `429 Too Many Requests` | `RATE_LIMITED` | 觸發 API Gateway / WAF Rate Limit | 轉換為 `{ phase: 'analyzing', retrying: true }`，延遲後自動重試 |
-| `500 / 504` | `INTERNAL_ERROR` | AWS 服務呼叫失敗或逾時 | 輪詢期間可重試，超過總逾時（30 秒）轉為 `{ phase: 'failed' }` |
+| `429 Too Many Requests` | `RATE_LIMITED` | 觸發 API Gateway / WAF Rate Limit | 轉換為 `{ phase: 'analyzing', retrying: true }`，延遲後自動重試並於成功後復原為 `retrying: false` |
+| `500 / 504` | `INTERNAL_ERROR` | AWS 服務呼叫失敗或逾時 | 輪詢期間可重試，超過輪詢逾時（30 秒）轉為 `{ phase: 'failed' }` |
+
+### 2.4 使用者異常操作防呆規格表 (Defensive Design Table)
+
+依 `Role_SA_PM_Engineer.md` 使用者異常操作防呆強制規則，針對 API 串接與後端整合定義異常操作防呆：
+
+| 異常類別 | 異常操作描述 | 觸發條件 | 系統回應 | 卡控位置 |
+|---|---|---|---|---|
+| **1. 參照完整性** | 對不存在或未建立成功的 `caseId` 回報客戶決策 | 呼叫 `POST /cases/{id}/decision` 時 `caseId` 不存在於 DynamoDB | DynamoDB `ConditionExpression` 驗證 `attribute_exists(caseId) AND userId = :uid`，拒絕建立孤兒決策紀錄 | 後端 API Gateway VTL + DynamoDB |
+| **2. 時序錯誤** | 圖片尚未全部上傳完成前就觸發 AI 分析，或上傳耗時擠壓輪詢時間 | 多張截圖並行上傳中，或行動網路上傳較慢 | 前端 `Promise.all` 確保所有 `PUT /cases/{id}/files/{n}` 皆 `200 OK` 後才呼叫 `POST /cases/{id}/analyze`；30 秒輪詢計時器自 `analyze` 成功後才獨立起算 | 前端 `useAnalysisView.ts` |
+| **3. 條件式必填** | 未新增任何證據或未勾選個資同意即點擊「開始分析」 | `items.length === 0` 或 `!consented` | 按鈕停用，直到至少新增 1 筆證據且勾選同意才可送出 | 前端 `GuardianEvidencePage` |
+| **4. 重複 / 衝突操作** | 被 WAF 阻擋（403）返回上傳清單後再次點擊「開始分析」，或 `?mock=` 與真實 API 混用 | 前次流程已產生舊 `caseId`，使用者重送或改用 `?mock=` | `useSubmitEvidence` 送出時重置 `setCaseId(null)`；`useReportDecision` 檢查 `explicitMock === null` 才呼叫真實 API | 前端 `useSubmitEvidence.ts` + `useReportDecision.ts` |
+| **5. 越權操作 (IDOR)** | 修改請求路徑的 `caseId` 或 Body 的 `s3Key` 企圖讀取／修改他人案件或截圖 | 惡意客戶端偽造他人 `caseId` 或 `s3Key` | VTL 強制由 `$context.authorizer.claims.sub` 取 `userId`；API 3 強制於 VTL 重組 `evidence/$userId/$caseId/...`；API 4 比對 `item.userId.S == callerUserId`（不符回 `403`）；API 5 檢查 `userId = :uid` | 後端 API Gateway VTL + Cognito Authorizer |
+| **6. 資料格式與圖片邊界** | 上傳損毀圖片、超過 10 MB 截圖，或輸入含單引號 `'`／`$` 字元之文字 | 截圖壓縮拋出例外，或文字摘要含 `NT$50,000`、`'` 等特殊字元 | `useAnalysisView.ts` 捕捉壓縮例外轉為 `{ phase: 'failed' }`（165 備援畫面，不卡死轉圈）；VTL 消除單引號非法跳脫 `\'` 並安全處理 `$` | 前端 `useAnalysisView.ts` + 後端 VTL |
+| **7. Token 過期重試與導向** | 查證期間 Cognito Token 過期（401） | 任一 API 回傳 `401` | `guardianApi.ts` 自動以 `REFRESH_TOKEN_AUTH` 換發新 Token 重試一次；仍失敗則導回 `/login` | 前端 `guardianApi.ts` + `useAnalysisView.ts` |
 
 ---
 
@@ -218,20 +234,20 @@ sequenceDiagram
   "Item": {
     "caseId": { "S": "$caseId" },
     "userId": { "S": "$userId" },
-    "mode": { "S": "$util.escapeJavaScript($inputRoot.mode)" },
+    "mode": { "S": "$util.escapeJavaScript($inputRoot.mode).replaceAll("\\'", "'")" },
     "status": { "S": "SUBMITTED" },
-    "consentedAt": { "S": "$util.escapeJavaScript($inputRoot.consentedAt)" },
+    "consentedAt": { "S": "$util.escapeJavaScript($inputRoot.consentedAt).replaceAll("\\'", "'")" },
     "submittedAt": { "S": "$context.requestTime" },
     "evidence": {
       "L": [
         #foreach($item in $inputRoot.evidence)
         {
           "M": {
-            "type": { "S": "$util.escapeJavaScript($item.type)" }
+            "type": { "S": "$util.escapeJavaScript($item.type).replaceAll("\\'", "'")" }
             #if($item.type == "image")
-            ,"s3Key": { "S": "evidence/$userId/$caseId/$util.escapeJavaScript($item.fileName)" }
+            ,"s3Key": { "S": "evidence/$userId/$caseId/$util.escapeJavaScript($item.fileName).replaceAll("\\'", "'")" }
             #else
-            ,"value": { "S": "$util.escapeJavaScript($item.value)" }
+            ,"value": { "S": "$util.escapeJavaScript($item.value).replaceAll("\\'", "'")" }
             #end
           }
         }#if($foreach.hasNext),#end
@@ -305,14 +321,14 @@ sequenceDiagram
 
 #### Request Body (`application/json`)
 
-前端將組裝完成的 `mode`、`submittedAt`（ISO 8601）與 `evidence`（圖片已換成 `s3Key: "evidence/{userId}/{caseId}/{n}"`）傳入：
+前端將組裝完成的 `mode`、`submittedAt`（ISO 8601）與 `evidence`（圖片包含 `fileName` 與 `s3Key`）傳入；API Gateway VTL 會強制以 `$context.authorizer.claims.sub` 與路徑 `{id}` 組裝 `s3Key`，防止客戶端偽造跨案件 S3 路徑：
 
 ```json
 {
   "mode": "passive",
   "submittedAt": "2026-11-09T16:00:05+08:00",
   "evidence": [
-    { "type": "image", "s3Key": "evidence/a1b2c3d4/c-7f3a/01.jpg" },
+    { "type": "image", "fileName": "01.jpg", "s3Key": "evidence/a1b2c3d4/c-7f3a/01.jpg" },
     { "type": "url", "value": "reurl.cc/abc123" },
     { "type": "text", "value": "保證每月穩賺 10%" }
   ]
@@ -321,7 +337,7 @@ sequenceDiagram
 
 #### Integration Request VTL (`application/json`)
 
-組裝出符合 [`docs/fraud-guardian-design.md` §6.1](./fraud-guardian-design.md) 的交接點 A JSON，並呼叫 Bedrock 團隊的狀態機：
+組裝出符合 [`docs/fraud-guardian-design.md` §6.1](./fraud-guardian-design.md) 的交接點 A JSON，並呼叫 Bedrock 團隊的狀態機（直接在模板本體組裝 `input` 字串，避免 VTL `#set` 雙引號內嵌 `$` 字元如 `NT$50,000` 時引發變數解析問題，並消除單引號 `\'` 非法 JSON 跳脫）：
 
 ```vtl
 #set($caseId = $input.params('id'))
@@ -330,11 +346,14 @@ sequenceDiagram
   #set($userId = "anonymous-dev")
 #end
 #set($inputRoot = $input.path('$'))
-#set($sfnInput = "{""schemaVersion"":""1.0"",""caseId"":""$util.escapeJavaScript($caseId)"",""userId"":""$util.escapeJavaScript($userId)"",""mode"":""$util.escapeJavaScript($inputRoot.mode)"",""submittedAt"":""$util.escapeJavaScript($inputRoot.submittedAt)"",""evidence"":$input.json('$.evidence')}")
+#set($safeCaseId = $util.escapeJavaScript($caseId).replaceAll("\\'", "'"))
+#set($safeUserId = $util.escapeJavaScript($userId).replaceAll("\\'", "'"))
+#set($safeMode = $util.escapeJavaScript($inputRoot.mode).replaceAll("\\'", "'"))
+#set($safeSubmittedAt = $util.escapeJavaScript($inputRoot.submittedAt).replaceAll("\\'", "'"))
 {
   "stateMachineArn": "${stageVariables.bedrockStateMachineArn}",
-  "name": "$util.escapeJavaScript($caseId)-$context.requestId",
-  "input": "$util.escapeJavaScript($sfnInput)"
+  "name": "${safeCaseId}-$context.requestId",
+  "input": "{\"schemaVersion\":\"1.0\",\"caseId\":\"${safeCaseId}\",\"userId\":\"${safeUserId}\",\"mode\":\"${safeMode}\",\"submittedAt\":\"${safeSubmittedAt}\",\"evidence\":[#foreach($item in $inputRoot.evidence)#set($itemType = $util.escapeJavaScript($item.type).replaceAll("\\'", "'"))#if($item.type == 'image')#if($item.fileName && $item.fileName != '')#set($safeFile = $util.escapeJavaScript($item.fileName).replaceAll("\\'", "'"))#set($resolvedKey = "evidence/${safeUserId}/${safeCaseId}/${safeFile}")#else#set($resolvedKey = $util.escapeJavaScript($item.s3Key).replaceAll("\\'", "'"))#end{\"type\":\"image\",\"s3Key\":\"$util.escapeJavaScript($resolvedKey).replaceAll("\\'", "'")\"}#else#set($firstEsc = $util.escapeJavaScript($item.value).replaceAll("\\'", "'"))#set($doubleEsc = $util.escapeJavaScript($firstEsc).replaceAll("\\'", "'")){\"type\":\"${itemType}\",\"value\":\"${doubleEsc}\"}#end#if($foreach.hasNext),#end#end]}"
 }
 ```
 
@@ -374,7 +393,7 @@ sequenceDiagram
 
 #### Integration Response VTL (`200 OK`, `application/json`)
 
-將 DynamoDB 原生型別結構 (`{"S": "..."}`) 轉換為前端 [`AnalysisResult`](../frontend/src/types/analysis.ts) 所需的乾淨 JSON，並檢查 `userId` 防止跨案件越權查詢：
+將 DynamoDB 原生型別結構 (`{"S": "..."}`) 轉換為前端 [`AnalysisResult`](../frontend/src/types/analysis.ts) 所需的乾淨 JSON，並檢查 `userId` 防止跨案件越權查詢（同時對 `FAILED` 狀態下可能缺漏的子欄位做防呆處理，並消除單引號 `\'` 非法 JSON 跳脫）：
 
 ```vtl
 #set($item = $input.path('$.Item'))
@@ -400,20 +419,22 @@ sequenceDiagram
   }
 #else
   {
-    "caseId": "$util.escapeJavaScript($item.caseId.S)",
-    "status": "$util.escapeJavaScript($item.status.S)"
+    "caseId": "$util.escapeJavaScript($item.caseId.S).replaceAll("\\'", "'")",
+    "status": "$util.escapeJavaScript($item.status.S).replaceAll("\\'", "'")"
     #if($item.result && $item.result.M)
     ,"result": {
-      "schemaVersion": "$util.escapeJavaScript($item.result.M.schemaVersion.S)",
-      "riskLevel": "$util.escapeJavaScript($item.result.M.riskLevel.S)",
-      "fraudType": "$util.escapeJavaScript($item.result.M.fraudType.S)",
+      "schemaVersion": #if($item.result.M.schemaVersion && $item.result.M.schemaVersion.S)"$util.escapeJavaScript($item.result.M.schemaVersion.S).replaceAll("\\'", "'")"#else"1.0"#end,
+      "riskLevel": #if($item.result.M.riskLevel && $item.result.M.riskLevel.S)"$util.escapeJavaScript($item.result.M.riskLevel.S).replaceAll("\\'", "'")"#else null #end,
+      "fraudType": #if($item.result.M.fraudType && $item.result.M.fraudType.S)"$util.escapeJavaScript($item.result.M.fraudType.S).replaceAll("\\'", "'")"#else null #end,
       "signals": [
+        #if($item.result.M.signals && $item.result.M.signals.L)
         #foreach($sig in $item.result.M.signals.L)
-          "$util.escapeJavaScript($sig.S)"#if($foreach.hasNext),#end
+          "$util.escapeJavaScript($sig.S).replaceAll("\\'", "'")"#if($foreach.hasNext),#end
+        #end
         #end
       ],
-      "suggestion": "$util.escapeJavaScript($item.result.M.suggestion.S)",
-      "errorCode": #if($item.result.M.errorCode && $item.result.M.errorCode.S && $item.result.M.errorCode.S != "")"$util.escapeJavaScript($item.result.M.errorCode.S)"#else null #end
+      "suggestion": #if($item.result.M.suggestion && $item.result.M.suggestion.S)"$util.escapeJavaScript($item.result.M.suggestion.S).replaceAll("\\'", "'")"#else null #end,
+      "errorCode": #if($item.result.M.errorCode && $item.result.M.errorCode.S && $item.result.M.errorCode.S != "")"$util.escapeJavaScript($item.result.M.errorCode.S).replaceAll("\\'", "'")"#else null #end
     }
     #end
   }
@@ -449,13 +470,13 @@ sequenceDiagram
 {
   "TableName": "ai-fraud-guardian-cases-${stageVariables.env}",
   "Key": {
-    "caseId": { "S": "$util.escapeJavaScript($caseId)" }
+    "caseId": { "S": "$util.escapeJavaScript($caseId).replaceAll("\\'", "'")" }
   },
-  "ConditionExpression": "userId = :uid",
+  "ConditionExpression": "attribute_exists(caseId) AND userId = :uid",
   "UpdateExpression": "SET decision = :dec, decidedAt = :now",
   "ExpressionAttributeValues": {
-    ":uid": { "S": "$util.escapeJavaScript($userId)" },
-    ":dec": { "S": "$util.escapeJavaScript($decision)" },
+    ":uid": { "S": "$util.escapeJavaScript($userId).replaceAll("\\'", "'")" },
+    ":dec": { "S": "$util.escapeJavaScript($decision).replaceAll("\\'", "'")" },
     ":now": { "S": "$context.requestTime" }
   }
 }
@@ -729,4 +750,19 @@ API Gateway 需要一個 IAM Role 才能代替前端去寫入 DynamoDB、上傳 
 - **串接檔案對應**：
   - [`frontend/src/lib/imageCompressor.ts`](../frontend/src/lib/imageCompressor.ts)：在瀏覽器端透過 Canvas 將截圖壓縮並限制於 `10 MB` 以內。
   - [`frontend/src/lib/guardianApi.ts`](../frontend/src/lib/guardianApi.ts)：封裝 5 支 API 的呼叫、Cognito Bearer Token Header 注入，以及 `401` / `403` / `429` 狀態碼解析。
-  - [`frontend/src/features/evidence/api/useSubmitEvidence.ts`](../frontend/src/features/evidence/api/useSubmitEvidence.ts)、[`frontend/src/features/analysis/api/useAnalysisView.ts`](../frontend/src/features/analysis/api/useAnalysisView.ts)、[`frontend/src/features/analysis/api/useReportDecision.ts`](../frontend/src/features/analysis/api/useReportDecision.ts)：串接完整 5 步驟非同步流程與每 2.5 秒輪詢（30 秒逾時自動切換 165 備援畫面）。
+  - [`frontend/src/features/evidence/api/useSubmitEvidence.ts`](../frontend/src/features/evidence/api/useSubmitEvidence.ts)、[`frontend/src/features/analysis/api/useAnalysisView.ts`](../frontend/src/features/analysis/api/useAnalysisView.ts)、[`frontend/src/features/analysis/api/useReportDecision.ts`](../frontend/src/features/analysis/api/useReportDecision.ts)：串接完整 5 步驟非同步流程與每 2.5 秒輪詢（自啟動分析起算 30 秒逾時自動切換 165 備援畫面）。
+
+---
+
+## 8. 版本與功能補充紀錄
+
+### 2026-11-10：API 串接邏輯與 API Gateway VTL 範本強化
+
+1. **前端 API 串接層（`features/*/api/`、`lib/guardianApi.ts`）強化**：
+   - `useAnalysisView`：將截圖壓縮納入錯誤捕捉（失敗時轉為 `{ phase: 'failed' }`）、`429` 退避重試成功後自動復原 `retrying: false`，並將 30 秒輪詢逾時基準點改為 `POST /cases/{id}/analyze` 完成後起算。
+   - `useSubmitEvidence`：於重新送出時先清除前次 `caseId`。
+   - `useReportDecision`：在 `?mock=` 模式下不發送真實 API 請求。
+2. **API Gateway VTL 範本（同步更新 [`docs/openapi-apigw.yaml`](./openapi-apigw.yaml)）強化**：
+   - 所有 VTL 字串跳脫補上 `.replaceAll("\\'", "'")`，防止輸入含單引號 `'` 時產生非法 JSON 跳脫序列 `\'`。
+   - API 3（`POST /cases/{id}/analyze`）改於模板本體組裝 `StartExecution` 的 `input` 字串並由 VTL 強制生成圖片 `s3Key`，避免文字含 `$`（如 `NT$50,000`）觸發 VTL 變數解析錯誤並防止跨案件 S3 路徑偽造。
+   - API 4（`GET /cases/{id}`）與 API 5（`POST /cases/{id}/decision`）分別補齊 `result` 子欄位 null-safe 檢查與 `attribute_exists(caseId)` 條件防護。
