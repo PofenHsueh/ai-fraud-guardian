@@ -71,7 +71,7 @@ export type CreateCaseResponse = {
 }
 
 export type AnalyzeEvidencePayload =
-  | { type: 'image'; s3Key: string }
+  | { type: 'image'; fileName: string; s3Key: string }
   | { type: 'url'; value: string }
   | { type: 'text'; value: string }
 

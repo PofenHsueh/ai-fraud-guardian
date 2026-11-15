@@ -46,11 +46,18 @@ const runRealAnalysisFlow = async (
 ): Promise<void> => {
   const startedAt = Date.now()
 
-  const callWithRetry = async <T>(fn: () => Promise<T>): Promise<T> => {
+  const callWithRetry = async <T>(fn: () => Promise<T>, timeoutOriginMs = startedAt): Promise<T> => {
+    let retried = false
     while (true) {
+      if (isCancelled()) throw new Error('Analysis flow cancelled')
       try {
-        return await fn()
+        const result = await fn()
+        if (retried && !isCancelled()) {
+          onViewChange({ phase: 'analyzing', retrying: false })
+        }
+        return result
       } catch (err) {
+        if (isCancelled()) throw err
         if (err instanceof ApiHttpError) {
           if (err.status === 401) {
             onUnauthorized()
@@ -60,7 +67,8 @@ const runRealAnalysisFlow = async (
             onViewChange({ phase: 'blocked' })
             throw err
           }
-          if (err.status === 429 && Date.now() - startedAt < POLL_TIMEOUT_MS) {
+          if (err.status === 429 && Date.now() - timeoutOriginMs < POLL_TIMEOUT_MS) {
+            retried = true
             onViewChange({ phase: 'analyzing', retrying: true })
             await sleep(BACKOFF_429_MS)
             continue
@@ -77,23 +85,29 @@ const runRealAnalysisFlow = async (
   const pendingUploads: Array<{ fileName: string; blob: Blob; contentType: string }> = []
   const createEvidenceItems: CreateCaseEvidenceItem[] = []
 
-  for (const item of submission.items) {
-    if (item.type === 'image') {
-      imageCounter += 1
-      const compressed = await compressImageForUpload(item.file)
-      const seq = String(imageCounter).padStart(2, '0')
-      const fileName = `${seq}.${compressed.ext}`
-      pendingUploads.push({
-        fileName,
-        blob: compressed.blob,
-        contentType: compressed.contentType,
-      })
-      createEvidenceItems.push({ type: 'image', fileName })
-    } else if (item.type === 'url') {
-      createEvidenceItems.push({ type: 'url', value: item.value })
-    } else {
-      createEvidenceItems.push({ type: 'text', value: item.value })
+  try {
+    for (const item of submission.items) {
+      if (item.type === 'image') {
+        imageCounter += 1
+        const compressed = await compressImageForUpload(item.file)
+        if (isCancelled()) return
+        const seq = String(imageCounter).padStart(2, '0')
+        const fileName = `${seq}.${compressed.ext}`
+        pendingUploads.push({
+          fileName,
+          blob: compressed.blob,
+          contentType: compressed.contentType,
+        })
+        createEvidenceItems.push({ type: 'image', fileName })
+      } else if (item.type === 'url') {
+        createEvidenceItems.push({ type: 'url', value: item.value })
+      } else {
+        createEvidenceItems.push({ type: 'text', value: item.value })
+      }
     }
+  } catch (err) {
+    if (!isCancelled()) onViewChange({ phase: 'failed' })
+    throw err
   }
 
   if (isCancelled()) return
@@ -124,6 +138,7 @@ const runRealAnalysisFlow = async (
     if (item.type === 'image') {
       return {
         type: 'image',
+        fileName: item.fileName,
         s3Key: `evidence/${created.userId}/${created.caseId}/${item.fileName}`,
       }
     }
@@ -137,13 +152,15 @@ const runRealAnalysisFlow = async (
       evidence: analyzeEvidence,
     }),
   )
+  if (isCancelled()) return
 
   // 步驟 5：API 4 每 2.5 秒輪詢 GET /cases/{id}（讀取交接點 C），逾時 30 秒轉為 failed
-  while (!isCancelled() && Date.now() - startedAt < POLL_TIMEOUT_MS) {
+  const pollStartedAt = Date.now()
+  while (!isCancelled() && Date.now() - pollStartedAt < POLL_TIMEOUT_MS) {
     await sleep(POLL_INTERVAL_MS)
     if (isCancelled()) return
 
-    const statusResp = await callWithRetry(() => getCaseStatus(created.caseId))
+    const statusResp = await callWithRetry(() => getCaseStatus(created.caseId), pollStartedAt)
     if (isCancelled()) return
 
     if (statusResp.status === 'COMPLETED' && statusResp.result) {
