@@ -6,6 +6,7 @@ AI 防詐安全守門員：客戶在模擬的 CUBE App 轉帳前，上傳可疑�
 - 前端：React 19 + Vite + TypeScript、Ant Design（`antd`）、react-router，行動優先網頁
 - 後端：API Gateway 直接整合 AWS 服務（不寫 Lambda）、DynamoDB、S3、Cognito
 - AI 研判（Step Functions、Bedrock）由 Bedrock 團隊負責，不在本 repo
+- 線上展示（AWS Amplify，`main` 分支）：https://main.d1sjh68duujvjr.amplifyapp.com/login
 
 ## 目錄
 
