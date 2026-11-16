@@ -20,7 +20,7 @@ paths:
       x-amazon-apigateway-integration:
         type: "aws"
         httpMethod: "POST"
-        uri: "arn:aws:apigateway:ap-northeast-1:dynamodb:action/PutItem"
+        uri: "arn:aws:apigateway:ap-southeast-1:dynamodb:action/PutItem"
         credentials: "arn:aws:iam::YOUR_ACCOUNT_ID:role/APIGatewayFraudGuardianRole"
         passthroughBehavior: "when_no_templates"
         requestTemplates:
@@ -108,7 +108,7 @@ paths:
       x-amazon-apigateway-integration:
         type: "aws"
         httpMethod: "PUT"
-        uri: "arn:aws:apigateway:ap-northeast-1:s3:path/${stageVariables.evidenceBucket}/evidence/{userId}/{caseId}/{n}"
+        uri: "arn:aws:apigateway:ap-southeast-1:s3:path/${stageVariables.evidenceBucket}/evidence/{userId}/{caseId}/{n}"
         credentials: "arn:aws:iam::YOUR_ACCOUNT_ID:role/APIGatewayFraudGuardianRole"
         passthroughBehavior: "when_no_match"
         requestParameters:
@@ -148,7 +148,7 @@ paths:
       x-amazon-apigateway-integration:
         type: "aws"
         httpMethod: "POST"
-        uri: "arn:aws:apigateway:ap-northeast-1:states:action/StartExecution"
+        uri: "arn:aws:apigateway:ap-southeast-1:states:action/StartExecution"
         credentials: "arn:aws:iam::YOUR_ACCOUNT_ID:role/APIGatewayFraudGuardianRole"
         passthroughBehavior: "when_no_templates"
         requestTemplates:
@@ -203,7 +203,7 @@ paths:
       x-amazon-apigateway-integration:
         type: "aws"
         httpMethod: "POST"
-        uri: "arn:aws:apigateway:ap-northeast-1:dynamodb:action/GetItem"
+        uri: "arn:aws:apigateway:ap-southeast-1:dynamodb:action/GetItem"
         credentials: "arn:aws:iam::YOUR_ACCOUNT_ID:role/APIGatewayFraudGuardianRole"
         passthroughBehavior: "when_no_templates"
         requestTemplates:
@@ -289,7 +289,7 @@ paths:
       x-amazon-apigateway-integration:
         type: "aws"
         httpMethod: "POST"
-        uri: "arn:aws:apigateway:ap-northeast-1:dynamodb:action/UpdateItem"
+        uri: "arn:aws:apigateway:ap-southeast-1:dynamodb:action/UpdateItem"
         credentials: "arn:aws:iam::YOUR_ACCOUNT_ID:role/APIGatewayFraudGuardianRole"
         passthroughBehavior: "when_no_templates"
         requestTemplates:
