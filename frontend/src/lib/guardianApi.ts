@@ -1,6 +1,7 @@
 import type { Decision } from '@/types/analysis'
 import type { GuardianMode } from '@/types/evidence'
-import { getStoredIdToken, refreshCognitoToken } from './cognitoAuth'
+import { paths } from '@/config/paths'
+import { clearAuthTokens, getStoredIdToken, isCognitoConfigured, refreshCognitoToken } from './cognitoAuth'
 
 export class ApiHttpError extends Error {
   readonly status: number
@@ -27,8 +28,19 @@ const buildHeaders = (contentType: string, tokenOverride?: string | null): Heade
   return headers
 }
 
+// 登入已失效（沒有 Token 或 Refresh Token 也換不到新 Token）：清除登入狀態並回登入頁重新登入
+const redirectToLogin = () => {
+  clearAuthTokens()
+  window.location.replace(`${paths.login}?expired=1`)
+}
+
 // 統一處理 API 請求；遇到 401 時先嘗試透過 Cognito Refresh Token 自動更新並重試一次
 const fetchWithAuthRetry = async (path: string, contentType: string, init: Omit<RequestInit, 'headers'>): Promise<Response> => {
+  if (isCognitoConfigured() && !getStoredIdToken()) {
+    redirectToLogin()
+    throw new ApiHttpError(401, 'Not signed in')
+  }
+
   const url = `${getApiBaseUrl()}${path}`
   const firstResponse = await fetch(url, {
     ...init,
@@ -41,6 +53,7 @@ const fetchWithAuthRetry = async (path: string, contentType: string, init: Omit<
 
   const refreshedToken = await refreshCognitoToken()
   if (!refreshedToken) {
+    if (isCognitoConfigured()) redirectToLogin()
     return firstResponse
   }
 

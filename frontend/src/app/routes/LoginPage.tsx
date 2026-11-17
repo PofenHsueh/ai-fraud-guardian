@@ -1,6 +1,6 @@
 import { App, Button, Form, Input, Typography } from 'antd'
-import { useState } from 'react'
-import { useNavigate } from 'react-router'
+import { useEffect, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router'
 import { paths } from '@/config/paths'
 import { BRAND_COLOR, BRAND_TINT } from '@/config/theme'
 import { isCognitoConfigured, signInWithCognito } from '@/lib/cognitoAuth'
@@ -15,6 +15,13 @@ export const LoginPage = () => {
   const [submitting, setSubmitting] = useState(false)
   const canLogin = account.trim() !== '' && password !== '' && !submitting
   const useCognito = isCognitoConfigured()
+  const [searchParams] = useSearchParams()
+  const sessionExpired = searchParams.get('expired') === '1'
+
+  // API 判定登入失效而導回時提示原因；固定 key 避免重複顯示
+  useEffect(() => {
+    if (sessionExpired) message.warning({ key: 'session-expired', content: '登入已逾時，請重新登入' })
+  }, [sessionExpired, message])
 
   const handleFinish = async () => {
     if (!useCognito) {
@@ -65,9 +72,11 @@ export const LoginPage = () => {
           登入
         </Button>
       </Form>
-      <Typography.Text type="secondary" className={styles.note}>
-        {useCognito ? '請輸入 Cognito 測試帳號與密碼登入。' : '此為示範頁面，不會驗證帳號密碼。'}
-      </Typography.Text>
+      {!useCognito && (
+        <Typography.Text type="secondary" className={styles.note}>
+          此為示範頁面，不會驗證帳號密碼。
+        </Typography.Text>
+      )}
     </main>
   )
 }
