@@ -9,7 +9,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 6em;
+  /* 顯示登入帳號（email），放得下 demo@example.com 這類長度，更長時以省略號截斷 */
+  max-width: 10em;
   font-size: 14px;
   color: rgba(0, 0, 0, 0.45);
 }
